@@ -4,6 +4,9 @@ from datetime import datetime
 import random
 from colorama import Fore, Style,init
 import time
+import os
+from urllib.parse import urlparse
+import platform
 
 # Initialize colorama
 init(autoreset=True)
@@ -39,14 +42,11 @@ def animated_logo():
         f"{Fore.BLUE}   /_/ |_/\___/\__/ |__/|__/\____/_/  /_/|_|   /____/\___/\__ _/_/ /_/_/ /_/\___/_/          ",
     ]
 
-    # Animate the logo with a typing effect
     for line in logo:
         print(line)
-        time.sleep(0.1)  # Pause briefly to create typing effect
-    time.sleep(1)
+        time.sleep(0.1)  
     print(f"{Fore.GREEN}\n" + "=" * 39 + " ɴᴀʀᴡʜᴀʟ ᴡᴀᴛᴄʜ " + "=" * 39 + "\n")
 
-# Utility Function for Random User-Agent
 def get_random_user_agent():
     return random.choice([
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3", 
@@ -55,37 +55,17 @@ def get_random_user_agent():
     ])
 
 
-# Network Port Scanning with Expanded Port List
+# Port Scanner
 def scan_port(ip, port):
     try:
-        # Create a TCP socket
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.settimeout(1)
-        
-        # Attempt to connect to the target IP and port
         result = sock.connect_ex((ip, port))
-        
-        if result == 0:  # Port is open
-            # Try to grab the banner (service information)
-            try:
-                banner = sock.recv(1024).decode().strip()  # Receive data (banner) from the service
-            except socket.timeout:
-                banner = "No banner received (timeout)"
-            except Exception as e:
-                banner = f"Error grabbing banner: {e}"
-            
-            # Close the socket after grabbing the banner
-            sock.close()
-            
-            # Return both the port status and the banner information
-            return True, banner
-        else:
-            # Port is closed, no banner available
-            sock.close()
-            return False, None
+        sock.close()
+        return result == 0
     except Exception as e:
         print(f"Error scanning port {port}: {e}")
-        return False, None
+        return False
 
 def network_scan(target_ip):
     common_ports = [21, 22, 23, 25, 53, 80, 110, 135, 139, 143, 443, 445, 993, 995, 1433, 1521, 3306, 3389, 5432, 5900, 8080]
@@ -96,6 +76,33 @@ def network_scan(target_ip):
             print(f"  - Port {port} is open.")
             open_ports.append(port)
     return open_ports
+
+#Check for database leak
+def check_domain_leak(api_key, domain):
+    url = f"https://haveibeenpwned.com/api/v3/breaches?domain={domain}"
+    headers = {
+        "hibp-api-key": api_key,
+        "User-Agent": "DatabaseLeakChecker"
+    }
+    try:
+        response = requests.get(url, headers=headers)
+        if response.status_code == 200:
+            return response.json()  
+        elif response.status_code == 404:
+            return "No breaches found for this domain."
+        else:
+            return f"Error: {response.status_code}"
+    except requests.RequestException as e:
+        return f"Request failed: {e}"
+
+def github_search(token, domain):
+    url = f"https://api.github.com/search/code?q={domain}+in:file"
+    headers = {"Authorization": f"token {token}"}
+    try:
+        response = requests.get(url, headers=headers)
+        return response.json() if response.status_code == 200 else "No results or error."
+    except requests.RequestException as e:
+        return f"Request failed: {e}"
 
 # OS Detection
 def detect_os(ip):
@@ -215,20 +222,51 @@ def print_report(network_results, service_results, os_info, web_vulnerabilities)
 
 # Main Function
 def main():
+    # Network Scan
     target_ip = input(f"{Fore.GREEN}{Style.BRIGHT}ᴇɴᴛᴇʀ ᴛᴀʀɢᴇᴛ ɪᴘ ꜰᴏʀ ɴᴇᴛᴡᴏʀᴋ ꜱᴄᴀɴ: ")
     open_ports = network_scan(target_ip)
     os_info = detect_os(target_ip)
-    service_info = {port: "Unknown Service" for port in open_ports}  # Placeholder for service details
+    service_info = {port: "Unknown Service" for port in open_ports} 
 
+    # Web Application Scan
     target_url = input(f"{Fore.GREEN}{Style.BRIGHT}ᴇɴᴛᴇʀ ᴛᴀʀɢᴇᴛ ᴜʀʟ ꜰᴏʀ ᴡᴇʙ ᴀᴘᴘʟɪᴄᴀᴛɪᴏɴ ꜱᴄᴀɴ: ")
     web_vulns = scan_web_application(target_url)
-    
+
+    # Extract domain from URL for further checks
+    domain = urlparse(target_url).netloc
+
+    # Database Leak Check
+    hibp_api_key = input("Enter Have I Been Pwned API key (or press Enter to skip): ")
+    if hibp_api_key:
+        domain_leaks = check_domain_leak(hibp_api_key, domain)
+    else:
+        domain_leaks = "HIBP check skipped."
+
+    # GitHub Search for Domain References
+    github_token = input("Enter GitHub API token (or press Enter to skip): ")
+    if github_token:
+        github_leaks = github_search(github_token, domain)
+    else:
+        github_leaks = "GitHub check skipped."
+
+    # Report Results
     print_report(
         network_results={"target_ip": target_ip, "open_ports": open_ports},
         service_results=service_info,
         os_info=os_info,
         web_vulnerabilities=web_vulns
     )
+
+    # Display Leak Information
+    print("\n--- Domain Leak Check Results ---")
+    print(f"Domain Leaks (HIBP): {domain_leaks}")
+    
+    print("\n--- GitHub Leak Check Results ---")
+    if isinstance(github_leaks, dict) and 'items' in github_leaks:
+        for item in github_leaks['items']:
+            print(f"  - {item['html_url']}")
+    else:
+        print(github_leaks)
 
 if __name__ == "__main__":
     animated_logo()
