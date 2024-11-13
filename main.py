@@ -163,7 +163,7 @@ def check_directory_traversal(url):
             pass
     return False
 
-# Brute-force Login Test (for demonstration)
+
 def brute_force_login(url):
     login_url = f"{url}/login"
     common_usernames = ["admin", "user", "test"]
@@ -232,7 +232,6 @@ def main():
     target_url = input(f"{Fore.GREEN}{Style.BRIGHT}ᴇɴᴛᴇʀ ᴛᴀʀɢᴇᴛ ᴜʀʟ ꜰᴏʀ ᴡᴇʙ ᴀᴘᴘʟɪᴄᴀᴛɪᴏɴ ꜱᴄᴀɴ: ")
     web_vulns = scan_web_application(target_url)
 
-    # Extract domain from URL for further checks
     domain = urlparse(target_url).netloc
 
     # Database Leak Check
