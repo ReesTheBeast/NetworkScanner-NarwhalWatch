@@ -31,7 +31,7 @@
 
 1. Clone the repository:
 
-   git clone https://github.com/username/narwhal-watch.git
+   git clone https://github.com/ReesTheBeast/narwhal-watch.git
    cd narwhal-watch
 Install the necessary libraries:
 
